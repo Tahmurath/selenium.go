@@ -1,0 +1,6 @@
+selenuim_go
+
+
+
+go get -t -d github.com/tebeka/selenium
+go mod init selenium-scraper
