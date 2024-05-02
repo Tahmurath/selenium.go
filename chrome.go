@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"log"
 	"os"
+	"time"
 
 	"github.com/tebeka/selenium"
 	"github.com/tebeka/selenium/chrome"
@@ -23,9 +24,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Error:", err)
 	}
-
 	defer service.Stop()
-
 	// configure the browser options
 	caps := selenium.Capabilities{}
 	caps.AddChrome(chrome.Capabilities{Args: []string{
@@ -33,6 +32,7 @@ func main() {
 	}})
 
 	// create a new remote client with the specified options
+
 	driver, err := selenium.NewRemote(caps, "")
 	if err != nil {
 		log.Fatal("Error:", err)
@@ -40,12 +40,45 @@ func main() {
 
 	// maximize the current window to avoid responsive rendering
 	err = driver.MaximizeWindow("")
+
 	if err != nil {
 		log.Fatal("Error:", err)
 	}
 
 	// visit the target page
 	err = driver.Get("https://scrapingclub.com/exercise/list_infinite_scroll/")
+	if err != nil {
+		log.Fatal("Error:", err)
+	}
+
+	// perform the scrolling interaction
+	scrollingScript := `
+  // scroll down the page 10 times
+  const scrolls = 10
+  let scrollCount = 0
+   
+  // scroll down and then wait for 0.5s
+  const scrollInterval = setInterval(() => {
+   window.scrollTo(0, document.body.scrollHeight)
+   scrollCount++
+   if (scrollCount === scrolls) {
+	clearInterval(scrollInterval)
+   }
+  }, 500)
+  `
+	_, err = driver.ExecuteScript(scrollingScript, []interface{}{})
+	if err != nil {
+		log.Fatal("Error:", err)
+	}
+
+	// wait up to 10 seconds for the 60th product to be on the page
+	err = driver.WaitWithTimeout(func(driver selenium.WebDriver) (bool, error) {
+		lastProduct, _ := driver.FindElement(selenium.ByCSSSelector, ".post:nth-child(60)")
+		if lastProduct != nil {
+			return lastProduct.IsDisplayed()
+		}
+		return false, nil
+	}, 10*time.Second)
 	if err != nil {
 		log.Fatal("Error:", err)
 	}
@@ -62,13 +95,13 @@ func main() {
 		// select the name and price nodes
 		nameElement, err := productElement.FindElement(selenium.ByCSSSelector, "h4")
 		priceElement, err := productElement.FindElement(selenium.ByCSSSelector, "h5")
+
 		// extract the data of interest
 		name, err := nameElement.Text()
 		price, err := priceElement.Text()
 		if err != nil {
 			log.Fatal("Error:", err)
 		}
-
 		// add the scraped data to the list
 		product := Product{}
 		product.name = name
@@ -97,8 +130,8 @@ func main() {
 	writer.Write(headers)
 
 	// adding each product to the CSV output file
-	for _, product := range products {
 
+	for _, product := range products {
 		// converting a Product to an array of strings
 		record := []string{
 			product.name,
